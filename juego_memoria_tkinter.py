@@ -4,6 +4,14 @@ from tkinter import messagebox
 
 
 class JuegoMemoria:
+    """Presets: 3x3 y 5x5 no son validos (cantidad impar de cartas). 3x4 y 5x4 son el equivalente en filas."""
+
+    PRESETS = (
+        ("3 × 4 (12 cartas)", 3, 4),
+        ("4 × 4 (16 cartas)", 4, 4),
+        ("5 × 4 (20 cartas)", 5, 4),
+    )
+
     def __init__(self, root, filas=4, columnas=4):
         if (filas * columnas) % 2 != 0:
             raise ValueError("La cantidad de cartas debe ser par.")
@@ -21,6 +29,7 @@ class JuegoMemoria:
         self.primera_carta = None
         self.segunda_carta = None
         self.bloqueado = False
+        self._after_id = None
 
         self.tablero = []
         self.botones = []
@@ -65,8 +74,58 @@ class JuegoMemoria:
         )
         self.boton_reiniciar.pack(side=tk.LEFT)
 
+        self.frame_tamano = tk.LabelFrame(self.root, text="Tamaño del tablero", padx=8, pady=6)
+        self.frame_tamano.pack(fill=tk.X, padx=10, pady=(0, 4))
+
+        self.tamano_var = tk.StringVar(value=f"{filas}x{columnas}")
+        for etiqueta, f, c in self.PRESETS:
+            tk.Radiobutton(
+                self.frame_tamano,
+                text=etiqueta,
+                variable=self.tamano_var,
+                value=f"{f}x{c}",
+                command=lambda ff=f, cc=c: self.cambiar_tamano(ff, cc),
+            ).pack(anchor=tk.W)
+
+        tk.Label(
+            self.frame_tamano,
+            text="Nota: 3×3 y 5×5 tienen cantidad impar de casillas; no sirven para pares.",
+            font=("Segoe UI", 9),
+            fg="#555",
+            wraplength=420,
+            justify=tk.LEFT,
+        ).pack(anchor=tk.W, pady=(6, 0))
+
         self.frame_tablero = tk.Frame(self.root, padx=10, pady=10)
         self.frame_tablero.pack()
+
+        self.crear_tablero()
+
+    def _cancelar_retraso(self):
+        if self._after_id is not None:
+            self.root.after_cancel(self._after_id)
+            self._after_id = None
+
+    def cambiar_tamano(self, filas, columnas):
+        if filas == self.filas and columnas == self.columnas:
+            return
+        if (filas * columnas) % 2 != 0:
+            return
+
+        self._cancelar_retraso()
+        self.filas = filas
+        self.columnas = columnas
+        self.total_pares = (filas * columnas) // 2
+
+        self.intentos = 0
+        self.pares_encontrados = 0
+        self.primera_carta = None
+        self.segunda_carta = None
+        self.bloqueado = False
+        self.label_intentos.config(text="Intentos: 0")
+
+        for w in self.frame_tablero.winfo_children():
+            w.destroy()
 
         self.crear_tablero()
 
@@ -122,9 +181,10 @@ class JuegoMemoria:
         self.intentos += 1
         self.label_intentos.config(text=f"Intentos: {self.intentos}")
         self.bloqueado = True
-        self.root.after(700, self.comprobar_coincidencia)
+        self._after_id = self.root.after(700, self.comprobar_coincidencia)
 
     def comprobar_coincidencia(self):
+        self._after_id = None
         idx1 = self.primera_carta
         idx2 = self.segunda_carta
 
@@ -150,6 +210,7 @@ class JuegoMemoria:
         self.bloqueado = False
 
     def reiniciar_juego(self):
+        self._cancelar_retraso()
         self.intentos = 0
         self.pares_encontrados = 0
         self.primera_carta = None
